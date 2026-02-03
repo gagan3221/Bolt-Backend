@@ -11,6 +11,7 @@ A modern REST API built with Go, Fiber, and MongoDB.
 - 🔄 Graceful shutdown handling
 - 📝 Logger middleware
 - 🌐 CORS support
+- 📚 Swagger/OpenAPI documentation
 
 ## Project Structure
 
@@ -18,6 +19,7 @@ A modern REST API built with Go, Fiber, and MongoDB.
 bolt-backend/
 ├── config/          # Configuration management
 ├── database/        # Database connection and utilities
+├── docs/            # Swagger documentation (auto-generated)
 ├── handlers/        # Request handlers
 ├── models/          # Data models
 ├── routes/          # Route definitions
@@ -76,6 +78,31 @@ go build -o bolt-backend
 ```
 
 The server will start on `http://localhost:3000` (or the port specified in your `.env` file).
+
+## Swagger API Documentation
+
+Once the server is running, you can access the interactive Swagger UI at:
+
+**http://localhost:3000/swagger/**
+
+The Swagger UI provides:
+
+- Interactive API documentation
+- Try-it-out functionality for all endpoints
+- Request/response examples
+- Schema definitions
+
+### Regenerating Swagger Docs
+
+After modifying API handlers or adding new endpoints, regenerate the Swagger documentation:
+
+```bash
+# Option 1: Use the helper script
+./generate-swagger.sh
+
+# Option 2: Run swag directly
+~/go/bin/swag init
+```
 
 ## API Endpoints
 

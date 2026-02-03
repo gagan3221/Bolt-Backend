@@ -13,7 +13,17 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// CreateUser handles POST /api/users
+// CreateUser godoc
+// @Summary Create a new user
+// @Description Create a new user with first name, last name, email and password
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param user body models.User true "User information"
+// @Success 201 {object} map[string]interface{} "User created successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request body or missing fields"
+// @Failure 500 {object} map[string]interface{} "Failed to create user"
+// @Router /api/users [post]
 func CreateUser(c *fiber.Ctx) error {
 	cfg := config.LoadConfig()
 	collection := database.GetCollection(cfg.DatabaseName, "users")
@@ -52,7 +62,15 @@ func CreateUser(c *fiber.Ctx) error {
 	})
 }
 
-// GetUsers handles GET /api/users
+// GetUsers godoc
+// @Summary Get all users
+// @Description Retrieve a list of all users from the database
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "List of users with count"
+// @Failure 500 {object} map[string]interface{} "Failed to fetch users"
+// @Router /api/users [get]
 func GetUsers(c *fiber.Ctx) error {
 	cfg := config.LoadConfig()
 	collection := database.GetCollection(cfg.DatabaseName, "users")
