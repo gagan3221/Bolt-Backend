@@ -11,6 +11,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
+	"github.com/golang-jwt/jwt/v5"
+
+
 )
 
 // CreateUser godoc
@@ -41,6 +45,15 @@ func CreateUser(c *fiber.Ctx) error {
 			"error": "All fields are required: first_name, last_name, email_id, password",
 		})
 	}
+	// Hash password
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+    if err != nil {
+         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+        "error": "Failed to hash password",
+    })
+}
+
+    user.Password = string(hashedPassword)
 
 	user.CreatedAt = time.Now()
 
@@ -97,4 +110,108 @@ func GetUsers(c *fiber.Ctx) error {
 		"users": users,
 		"count": len(users),
 	})
+}
+// Login godoc
+// @Summary Login user
+// @Description Login using email and password
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param request body models.LoginRequest true "Login Request"
+// @Success 200 {object} map[string]string
+// @Router /api/users/login [post]
+func LoginUser(c *fiber.Ctx) error {
+    cfg := config.LoadConfig()
+    collection := database.GetCollection(cfg.DatabaseName, "users")
+
+    var req models.LoginRequest
+
+    if err := c.BodyParser(&req); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Invalid request",
+        })
+    }
+
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    var user models.User
+    err := collection.FindOne(ctx, bson.M{"email_id": req.EmailID}).Decode(&user)
+    if err != nil {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "User not found",
+        })
+    }
+
+    // Compare password
+    err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+    if err != nil {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Invalid password",
+        })
+    }
+
+    // Generate JWT
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "user_id": user.ID.Hex(),
+        "email":   user.EmailID,
+        "exp":     time.Now().Add(time.Hour * 1).Unix(),
+    })
+
+    tokenString, err := token.SignedString([]byte("your-secret-key"))
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Could not generate token",
+        })
+    }
+
+    return c.JSON(fiber.Map{
+        "message": "Login successful",
+        "token":   tokenString,
+    })
+}
+
+// RefreshToken godoc
+// @Summary Refresh JWT token
+// @Description Generate new token using existing token
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Success 200 {object} map[string]string
+// @Router /api/users/refresh [post]
+func RefreshToken(c *fiber.Ctx) error {
+    tokenString := c.Get("Authorization")
+
+    if tokenString == "" {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Missing token",
+        })
+    }
+
+    tokenString = tokenString[len("Bearer "):]
+
+    token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+        return []byte("your-secret-key"), nil
+    })
+
+    if err != nil || !token.Valid {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+            "error": "Invalid token",
+        })
+    }
+
+    claims := token.Claims.(jwt.MapClaims)
+
+    newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "user_id": claims["user_id"],
+        "email":   claims["email"],
+        "exp":     time.Now().Add(time.Hour * 1).Unix(),
+    })
+
+    newTokenString, _ := newToken.SignedString([]byte("your-secret-key"))
+
+    return c.JSON(fiber.Map{
+        "token": newTokenString,
+    })
 }
